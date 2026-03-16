@@ -1,78 +1,449 @@
+```html
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Chat Room</title>
-    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-    <style>
-        body {
-            display: flex;
-            font-family: Arial, sans-serif;
-        }
-        #users {
-            width: 200px;
-            border-right: 1px solid #ccc;
-            padding: 10px;
-        }
-        #chat-container {
-            flex: 1;
-            padding: 10px;
-        }
-        #chat {
-            border: 1px solid #000;
-            height: 300px;
-            overflow-y: scroll;
-            padding: 10px;
-        }
-    </style>
+<title>Messenger</title>
+
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+
+<style>
+
+*{
+box-sizing:border-box;
+font-family:Segoe UI,Arial;
+}
+
+body{
+margin:0;
+display:flex;
+height:100vh;
+background:#0f172a;
+color:white;
+}
+
+/* SIDEBAR */
+
+#sidebar{
+width:280px;
+background:#111827;
+display:flex;
+flex-direction:column;
+padding:20px;
+border-right:1px solid #1f2937;
+}
+
+#sidebar h3{
+margin-bottom:15px;
+}
+
+#search{
+padding:10px;
+border:none;
+border-radius:6px;
+background:#1f2937;
+color:white;
+margin-bottom:15px;
+}
+
+#online-users{
+list-style:none;
+padding:0;
+margin:0;
+flex:1;
+overflow-y:auto;
+}
+
+#online-users li{
+padding:10px;
+border-radius:8px;
+cursor:pointer;
+display:flex;
+align-items:center;
+justify-content:space-between;
+margin-bottom:6px;
+transition:.2s;
+}
+
+#online-users li:hover{
+background:#1f2937;
+}
+
+.avatar{
+width:28px;
+height:28px;
+border-radius:50%;
+background:#6366f1;
+display:flex;
+align-items:center;
+justify-content:center;
+font-size:12px;
+margin-right:8px;
+}
+
+.user-row{
+display:flex;
+align-items:center;
+}
+
+.badge{
+background:red;
+padding:2px 6px;
+border-radius:10px;
+font-size:10px;
+}
+
+/* CHAT AREA */
+
+#chat-container{
+flex:1;
+display:flex;
+flex-direction:column;
+}
+
+/* HEADER */
+
+#chat-header{
+background:#111827;
+padding:15px;
+border-bottom:1px solid #1f2937;
+font-weight:500;
+}
+
+/* CHAT BOX */
+
+#chat{
+flex:1;
+padding:20px;
+overflow-y:auto;
+display:flex;
+flex-direction:column;
+}
+
+/* MESSAGE */
+
+.message{
+max-width:60%;
+padding:12px;
+margin-bottom:10px;
+border-radius:12px;
+animation:fade .2s ease;
+}
+
+@keyframes fade{
+from{opacity:0;transform:translateY(5px)}
+to{opacity:1;transform:translateY(0)}
+}
+
+.me{
+background:#6366f1;
+margin-left:auto;
+}
+
+.other{
+background:#1f2937;
+}
+
+.time{
+font-size:10px;
+opacity:.6;
+display:block;
+margin-top:4px;
+}
+
+.status{
+font-size:10px;
+margin-left:5px;
+}
+
+/* INPUT */
+
+#input-area{
+display:flex;
+padding:15px;
+background:#111827;
+border-top:1px solid #1f2937;
+}
+
+#message{
+flex:1;
+padding:12px;
+border-radius:20px;
+border:none;
+background:#1f2937;
+color:white;
+}
+
+#message:focus{
+outline:none;
+}
+
+button{
+margin-left:10px;
+padding:10px 18px;
+border:none;
+border-radius:20px;
+background:#6366f1;
+color:white;
+cursor:pointer;
+transition:.2s;
+}
+
+button:hover{
+background:#4f46e5;
+}
+
+/* ONLINE DOT */
+
+.online{
+width:8px;
+height:8px;
+background:#22c55e;
+border-radius:50%;
+margin-left:6px;
+}
+
+.logout{
+margin-top:10px;
+color:#aaa;
+text-decoration:none;
+font-size:14px;
+}
+
+.logout:hover{
+color:white;
+}
+
+</style>
 </head>
+
 <body>
 
-<div id="users">
-    <h4>Online Users</h4>
-    <ul id="online-users"></ul>
+<div id="sidebar">
+
+<h3>Messenger</h3>
+
+<input id="search" placeholder="Search users">
+
+<ul id="online-users">
+
+{% for u in users %}
+<li onclick="openPrivate('{{u.username}}')">
+
+<div class="user-row">
+<div class="avatar">{{u.username[0]|upper}}</div>
+<span>{{u.username}}</span>
+</div>
+
+<span id="b_{{u.username}}"></span>
+
+</li>
+{% endfor %}
+
+</ul>
+
+<a href="#" onclick="openGlobal()" class="logout">Global Chat</a>
+<a href="{{url_for('logout')}}" class="logout">Logout</a>
+
 </div>
 
 <div id="chat-container">
-    <h3>Welcome, {{ user }}</h3>
 
-    <div id="chat">
-        {% for msg in messages %}
-            <p>[{{ msg.timestamp }}] {{ msg.username }}: {{ msg.message }}</p>
-        {% endfor %}
-    </div>
+<div id="chat-header">
+<span id="chat-title">Global Chat</span>
+</div>
 
-    <input type="text" id="message" placeholder="Type message">
-    <button onclick="sendMessage()">Send</button>
+<div id="chat">
 
-    <br><br>
-    <a href="{{ url_for('logout') }}">Logout</a>
+{% for msg in messages %}
+<div class="message other">
+<b>{{msg.username}}</b><br>
+{{msg.message}}
+<span class="time">{{msg.timestamp}}</span>
+</div>
+{% endfor %}
+
+</div>
+
+<div id="input-area">
+
+<input id="message" placeholder="Type message">
+
+<button onclick="sendMessage()">Send</button>
+
+</div>
+
 </div>
 
 <script>
-    var socket = io();
 
-    socket.on("message", function(msg) {
-        var chat = document.getElementById("chat");
-        chat.innerHTML += "<p>" + msg + "</p>";
-        chat.scrollTop = chat.scrollHeight;
-    });
+var socket=io();
+var currentUser="{{user}}";
+var currentChat=null;
 
-    socket.on("online_users", function(users) {
-        var list = document.getElementById("online-users");
-        list.innerHTML = "";
-        users.forEach(function(user) {
-            list.innerHTML += "<li>" + user + "</li>";
-        });
-    });
+var chats={};
+var unread={};
 
-    function sendMessage() {
-        var input = document.getElementById("message");
-        if (input.value.trim() !== "") {
-            socket.send(input.value);
-            input.value = "";
-        }
-    }
+function renderChat(){
+
+let box=document.getElementById("chat");
+box.innerHTML="";
+
+let key=currentChat||"global";
+
+if(!chats[key]) return;
+
+chats[key].forEach(m=>box.appendChild(m));
+
+box.scrollTop=box.scrollHeight;
+
+}
+
+function store(key,div){
+
+if(!chats[key]) chats[key]=[];
+
+chats[key].push(div);
+
+}
+
+/* GLOBAL */
+
+socket.on("message",function(data){
+
+let div=document.createElement("div");
+div.className="message other";
+
+div.innerHTML="<b>"+data.username+"</b><br>"+data.message+
+"<span class='time'>"+data.time+"</span>";
+
+store("global",div);
+
+if(currentChat==null) renderChat();
+
+});
+
+/* PRIVATE */
+
+socket.on("private_message",function(data){
+
+let div=document.createElement("div");
+
+div.className=(data.sender===currentUser)?"message me":"message other";
+
+div.innerHTML=data.message+
+"<span class='time'>"+data.time+
+"<span class='status' id='s_"+data.id+"'> ✓ </span></span>";
+
+let key=(data.sender===currentUser)?data.receiver:data.sender;
+
+store(key,div);
+
+if(currentChat===key){
+
+renderChat();
+
+if(data.sender!==currentUser)
+socket.emit("message_read",{id:data.id});
+
+}else{
+
+unread[key]=(unread[key]||0)+1;
+updateBadge(key);
+
+}
+
+});
+
+/* READ */
+
+socket.on("message_status",function(data){
+
+let el=document.getElementById("s_"+data.id);
+
+if(el) el.innerText="✓✓";
+
+});
+
+/* OPEN PRIVATE */
+
+function openPrivate(user){
+
+currentChat=user;
+
+document.getElementById("chat-title").innerText="Chat with "+user;
+
+socket.emit("join_private",{user:user});
+
+unread[user]=0;
+updateBadge(user);
+
+renderChat();
+
+}
+
+/* GLOBAL */
+
+function openGlobal(){
+
+currentChat=null;
+
+document.getElementById("chat-title").innerText="Global Chat";
+
+renderChat();
+
+}
+
+/* SEND */
+
+function sendMessage(){
+
+let input=document.getElementById("message");
+let text=input.value.trim();
+
+if(text==="") return;
+
+if(currentChat==null){
+
+socket.emit("message",text);
+
+}else{
+
+socket.emit("private_message",{
+receiver:currentChat,
+message:text
+});
+
+}
+
+input.value="";
+
+}
+
+/* ENTER SEND */
+
+document.getElementById("message").addEventListener("keypress",function(e){
+
+if(e.key==="Enter") sendMessage();
+
+});
+
+/* BADGE */
+
+function updateBadge(user){
+
+let b=document.getElementById("b_"+user);
+
+if(!b) return;
+
+if(unread[user]>0)
+b.innerHTML="<span class='badge'>"+unread[user]+"</span>";
+else
+b.innerHTML="";
+
+}
+
 </script>
 
 </body>
 </html>
+```
