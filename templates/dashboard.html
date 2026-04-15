@@ -1,5 +1,3 @@
-```html
-<!DOCTYPE html>
 <html>
 <head>
 <title>Messenger</title>
@@ -62,10 +60,16 @@ align-items:center;
 justify-content:space-between;
 margin-bottom:6px;
 transition:.2s;
+position:relative;
 }
 
 #online-users li:hover{
 background:#1f2937;
+}
+
+/* ACTIVE USER */
+#online-users li.active{
+background:#1e293b;
 }
 
 .avatar{
@@ -100,13 +104,15 @@ display:flex;
 flex-direction:column;
 }
 
-/* HEADER */
+/* HEADER IMPROVED */
 
 #chat-header{
-background:#111827;
+background:#0b1220;
 padding:15px;
 border-bottom:1px solid #1f2937;
-font-weight:500;
+font-size:16px;
+font-weight:600;
+letter-spacing:.3px;
 }
 
 /* CHAT BOX */
@@ -119,13 +125,15 @@ display:flex;
 flex-direction:column;
 }
 
-/* MESSAGE */
+/* MESSAGE BUBBLE IMPROVED */
 
 .message{
-max-width:60%;
-padding:12px;
+max-width:65%;
+padding:10px 14px;
 margin-bottom:10px;
-border-radius:12px;
+border-radius:16px;
+line-height:1.4;
+position:relative;
 animation:fade .2s ease;
 }
 
@@ -135,12 +143,14 @@ to{opacity:1;transform:translateY(0)}
 }
 
 .me{
-background:#6366f1;
+background:#4f46e5;
 margin-left:auto;
+border-bottom-right-radius:4px;
 }
 
 .other{
-background:#1f2937;
+background:#1e293b;
+border-bottom-left-radius:4px;
 }
 
 .time{
@@ -227,7 +237,7 @@ color:white;
 <ul id="online-users">
 
 {% for u in users %}
-<li onclick="openPrivate('{{u.username}}')">
+<li onclick="openPrivate(event,'{{u.username}}')">
 
 <div class="user-row">
 <div class="avatar">{{u.username[0]|upper}}</div>
@@ -282,6 +292,8 @@ var currentChat=null;
 
 var chats={};
 var unread={};
+
+/* RENDER */
 
 function renderChat(){
 
@@ -366,7 +378,7 @@ if(el) el.innerText="✓✓";
 
 /* OPEN PRIVATE */
 
-function openPrivate(user){
+function openPrivate(e,user){
 
 currentChat=user;
 
@@ -379,6 +391,10 @@ updateBadge(user);
 
 renderChat();
 
+/* ACTIVE HIGHLIGHT */
+document.querySelectorAll("#online-users li").forEach(li=>li.classList.remove("active"));
+e.currentTarget.classList.add("active");
+
 }
 
 /* GLOBAL */
@@ -390,6 +406,8 @@ currentChat=null;
 document.getElementById("chat-title").innerText="Global Chat";
 
 renderChat();
+
+document.querySelectorAll("#online-users li").forEach(li=>li.classList.remove("active"));
 
 }
 
@@ -446,4 +464,3 @@ b.innerHTML="";
 
 </body>
 </html>
-```

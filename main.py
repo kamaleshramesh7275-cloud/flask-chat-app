@@ -163,7 +163,7 @@ def logout():
     return redirect(url_for("index"))
 
 
-# ---------------- SOCKET EVENTS ----------------
+
 
 
 @socketio.on("connect")
@@ -176,7 +176,7 @@ def handle_connect():
 
     online_users.add(username)
 
-    # join personal room
+
     join_room(username)
 
     emit("online_users", list(online_users), broadcast=True)

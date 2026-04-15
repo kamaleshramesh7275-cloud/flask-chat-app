@@ -1,9 +1,8 @@
-```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Messenger Login</title>
+<title>GAMA Messenger</title>
 
 <style>
 
@@ -21,15 +20,35 @@ display:flex;
 height:100vh;
 color:white;
 overflow:hidden;
-background:linear-gradient(270deg,#6366f1,#9333ea,#3b82f6);
-background-size:600% 600%;
-animation:bgmove 15s ease infinite;
+background:radial-gradient(circle at top,#1e1b4b,#020617 70%);
 }
 
-@keyframes bgmove{
-0%{background-position:0% 50%}
-50%{background-position:100% 50%}
-100%{background-position:0% 50%}
+/* BACKGROUND GLOW ORBS */
+
+.orb{
+position:absolute;
+border-radius:50%;
+filter:blur(80px);
+opacity:.5;
+}
+
+.orb1{
+width:300px;height:300px;
+background:#6366f1;
+top:10%;left:15%;
+animation:move 10s infinite alternate;
+}
+
+.orb2{
+width:250px;height:250px;
+background:#9333ea;
+bottom:10%;right:15%;
+animation:move 12s infinite alternate;
+}
+
+@keyframes move{
+from{transform:translateY(0)}
+to{transform:translateY(40px)}
 }
 
 /* LEFT PANEL */
@@ -40,42 +59,27 @@ display:flex;
 flex-direction:column;
 justify-content:center;
 align-items:center;
-position:relative;
+z-index:2;
 }
 
-.left-panel h1{
-font-size:56px;
-letter-spacing:3px;
-margin-bottom:10px;
-animation:fadeup 1s ease;
+.logo{
+font-size:70px;
+font-weight:bold;
+letter-spacing:6px;
+background:linear-gradient(90deg,#6366f1,#a78bfa,#22c55e);
+-webkit-background-clip:text;
+-webkit-text-fill-color:transparent;
+animation:glow 2s infinite alternate;
 }
 
-.left-panel p{
-font-size:18px;
-opacity:.9;
-animation:fadeup 1.4s ease;
+@keyframes glow{
+from{text-shadow:0 0 20px #6366f1;}
+to{text-shadow:0 0 40px #a78bfa;}
 }
 
-/* floating particles */
-
-.particle{
-position:absolute;
-width:6px;
-height:6px;
-background:white;
-border-radius:50%;
-opacity:.4;
-animation:float 10s infinite linear;
-}
-
-@keyframes float{
-0%{transform:translateY(0)}
-100%{transform:translateY(-900px)}
-}
-
-@keyframes fadeup{
-from{opacity:0;transform:translateY(20px)}
-to{opacity:1;transform:translateY(0)}
+.tagline{
+margin-top:10px;
+opacity:.7;
 }
 
 /* RIGHT PANEL */
@@ -85,132 +89,145 @@ width:420px;
 display:flex;
 justify-content:center;
 align-items:center;
-backdrop-filter:blur(10px);
+z-index:2;
 }
 
-/* LOGIN CARD */
+/* CARD WITH GLOW BORDER */
 
 .auth-card{
-
-width:330px;
-
+width:340px;
 padding:40px;
+border-radius:20px;
+position:relative;
+background:rgba(255,255,255,0.05);
+backdrop-filter:blur(20px);
+box-shadow:0 20px 60px rgba(0,0,0,.7);
+}
 
-border-radius:14px;
+/* animated border */
 
-background:rgba(0,0,0,0.45);
+.auth-card::before{
+content:"";
+position:absolute;
+inset:-2px;
+border-radius:22px;
+background:linear-gradient(270deg,#6366f1,#9333ea,#22c55e);
+background-size:400% 400%;
+animation:borderMove 6s linear infinite;
+z-index:-1;
+}
 
-backdrop-filter:blur(12px);
-
-box-shadow:0 20px 40px rgba(0,0,0,.5);
-
-animation:fadeup 1s ease;
-
+@keyframes borderMove{
+0%{background-position:0%}
+100%{background-position:400%}
 }
 
 .auth-card h2{
-margin-bottom:25px;
-font-weight:500;
+text-align:center;
+margin-bottom:30px;
 }
 
-/* INPUT */
+/* FLOATING INPUT */
 
 .input-group{
-margin-bottom:18px;
 position:relative;
+margin-bottom:22px;
 }
 
-input{
+.input-group input{
 width:100%;
-padding:12px;
-border-radius:6px;
-border:none;
-background:#1f2937;
+padding:14px;
+background:transparent;
+border:1px solid rgba(255,255,255,.2);
+border-radius:8px;
 color:white;
 font-size:14px;
-transition:.3s;
 }
 
-input:focus{
+.input-group label{
+position:absolute;
+left:12px;
+top:50%;
+transform:translateY(-50%);
+font-size:13px;
+opacity:.6;
+transition:.3s;
+pointer-events:none;
+}
+
+.input-group input:focus + label,
+.input-group input:valid + label{
+top:-8px;
+font-size:10px;
+background:#020617;
+padding:2px 6px;
+border-radius:4px;
+}
+
+.input-group input:focus{
 outline:none;
-box-shadow:0 0 8px #6366f1;
-transform:scale(1.02);
+border-color:#6366f1;
+box-shadow:0 0 12px #6366f1;
 }
 
 /* PASSWORD TOGGLE */
 
 .toggle{
 position:absolute;
-right:10px;
+right:12px;
 top:50%;
 transform:translateY(-50%);
 cursor:pointer;
-opacity:.8;
 }
 
 /* BUTTONS */
 
 .btn-group{
 display:flex;
-gap:10px;
-margin-top:20px;
+gap:12px;
+margin-top:25px;
 }
 
 button{
-
 flex:1;
-
-padding:12px;
-
+padding:13px;
 border:none;
-
-border-radius:6px;
-
-font-size:14px;
-
+border-radius:8px;
 cursor:pointer;
-
 color:white;
-
+font-weight:500;
 position:relative;
-
 overflow:hidden;
-
-transition:.3s;
-
 }
 
+/* BUTTON STYLES */
+
 .login-btn{
-background:#6366f1;
+background:linear-gradient(135deg,#6366f1,#8b5cf6);
 }
 
 .register-btn{
-background:#22c55e;
+background:linear-gradient(135deg,#22c55e,#4ade80);
 }
 
 button:hover{
-transform:translateY(-2px);
-box-shadow:0 10px 20px rgba(0,0,0,.4);
+transform:scale(1.05);
 }
 
-/* ripple effect */
+/* PULSE EFFECT */
 
 button::after{
 content:"";
 position:absolute;
-width:0;
-height:0;
-background:rgba(255,255,255,.3);
-border-radius:50%;
-top:50%;
-left:50%;
-transform:translate(-50%,-50%);
-transition:.5s;
+width:100%;
+height:100%;
+background:rgba(255,255,255,.2);
+opacity:0;
+transition:.3s;
 }
 
 button:active::after{
-width:200px;
-height:200px;
+opacity:1;
 }
 
 /* ERROR */
@@ -218,16 +235,16 @@ height:200px;
 .error{
 color:#ef4444;
 margin-top:15px;
-font-size:14px;
+text-align:center;
 }
 
 /* FOOTER */
 
 .footer{
 margin-top:20px;
-font-size:12px;
-opacity:.7;
 text-align:center;
+opacity:.6;
+font-size:12px;
 }
 
 </style>
@@ -235,64 +252,41 @@ text-align:center;
 
 <body>
 
-<!-- LEFT SIDE -->
+<!-- ORBS -->
+<div class="orb orb1"></div>
+<div class="orb orb2"></div>
+
+<!-- LEFT -->
 
 <div class="left-panel">
-
-<h1>Messenger</h1>
-<p>Real-time encrypted communication</p>
-
-<!-- particles -->
-
-<script>
-for(let i=0;i<40;i++){
-
-let p=document.createElement("div");
-p.className="particle";
-
-p.style.left=Math.random()*100+"%";
-p.style.bottom="-20px";
-p.style.animationDuration=(6+Math.random()*8)+"s";
-
-document.body.appendChild(p);
-
-}
-</script>
-
+<div class="logo">GAMA</div>
+<div class="tagline">Secure • Real-time • Private</div>
 </div>
 
-<!-- RIGHT SIDE -->
+<!-- RIGHT -->
 
 <div class="right-panel">
 
 <div class="auth-card">
 
-<h2>Login / Register</h2>
+<h2>Welcome</h2>
 
 <form method="POST">
 
 <div class="input-group">
-<input type="text" name="username" placeholder="Username" required>
+<input type="text" name="username" required>
+<label>Username</label>
 </div>
 
 <div class="input-group">
-
-<input id="password" type="password" name="password" placeholder="Password" required>
-
+<input id="password" type="password" name="password" required>
+<label>Password</label>
 <span class="toggle" onclick="togglePassword()">👁</span>
-
 </div>
 
 <div class="btn-group">
-
-<button type="submit" name="action" value="login" class="login-btn">
-Login
-</button>
-
-<button type="submit" name="action" value="register" class="register-btn">
-Register
-</button>
-
+<button type="submit" name="action" value="login" class="login-btn">Login</button>
+<button type="submit" name="action" value="register" class="register-btn">Register</button>
 </div>
 
 </form>
@@ -301,9 +295,7 @@ Register
 <div class="error">{{error}}</div>
 {% endif %}
 
-<div class="footer">
-Secure messaging platform
-</div>
+<div class="footer">End-to-end secure messaging</div>
 
 </div>
 
@@ -312,15 +304,11 @@ Secure messaging platform
 <script>
 
 function togglePassword(){
-
 let p=document.getElementById("password");
-
 p.type=p.type==="password"?"text":"password";
-
 }
 
 </script>
 
 </body>
 </html>
-```
