@@ -1,323 +1,337 @@
-import os
-import sqlite3
+from flask import Flask, render_template, request
+from flask_socketio import SocketIO
 from datetime import datetime
-from flask import Flask, render_template, request, redirect, url_for, session
-from flask_socketio import SocketIO, emit, join_room
-from werkzeug.security import generate_password_hash, check_password_hash
+import sqlite3
+import bcrypt
+from cryptography.fernet import Fernet
 
+# ---------------- APP ----------------
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", "dev_key")
+app.config["SECRET_KEY"] = "secret"
 
-socketio = SocketIO(
-    app,
-    cors_allowed_origins="*",
-    manage_session=True,
-    async_mode="threading"
-)
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
 
-DB_NAME = "users.db"
-
-online_users = set()
-
-
+# ---------------- DATABASE ----------------
 def get_db():
-    conn = sqlite3.connect(DB_NAME, check_same_thread=False)
+    conn = sqlite3.connect("chat.db")
     conn.row_factory = sqlite3.Row
     return conn
 
-
 def init_db():
-
-    db = get_db()
-    cursor = db.cursor()
-
+    conn = get_db()
+    cursor = conn.cursor()
     cursor.execute("""
-    CREATE TABLE IF NOT EXISTS users(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        username TEXT UNIQUE,
+    CREATE TABLE IF NOT EXISTS users (
+        username TEXT PRIMARY KEY,
         password TEXT
     )
     """)
-
     cursor.execute("""
-    CREATE TABLE IF NOT EXISTS messages(
+    CREATE TABLE IF NOT EXISTS messages (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         username TEXT,
+        to_user TEXT DEFAULT 'global',
+        group_id INTEGER DEFAULT 0,
         message TEXT,
-        timestamp TEXT
+        time TEXT,
+        msg_type TEXT DEFAULT 'text',
+        is_read INTEGER DEFAULT 0,
+        reactions TEXT DEFAULT '{}'
     )
     """)
 
     cursor.execute("""
-    CREATE TABLE IF NOT EXISTS private_messages(
+    CREATE TABLE IF NOT EXISTS groups (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        sender TEXT,
-        receiver TEXT,
-        message TEXT,
-        timestamp TEXT,
-        status TEXT DEFAULT 'sent'
+        name TEXT,
+        created_by TEXT
     )
     """)
 
-    db.commit()
-    db.close()
-
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS group_members (
+        group_id INTEGER,
+        username TEXT
+    )
+    """)
+    conn.commit()
+    conn.close()
 
 init_db()
 
+# ---------------- SESSION ----------------
+users = {}      # sid -> username
+user_sid = {}   # username -> sid
 
-def get_room(user1, user2):
-    users = sorted([user1, user2])
-    return f"{users[0]}_{users[1]}"
+# ---------------- ENCRYPTION (FIXED KEY) ----------------
+# IMPORTANT: keep this constant forever
+SECRET_KEY = b'6VZr3X0nJ9vYkW8zPqL4hT2sU1xC5aB7D8eF0gH1Ijk='
+cipher = Fernet(SECRET_KEY)
 
+def encrypt_msg(msg):
+    if not msg: return ""
+    return cipher.encrypt(msg.encode()).decode()
 
-@app.route("/", methods=["GET", "POST"])
-def index():
+def decrypt_msg(msg):
+    if not msg: return ""
+    try:
+        return cipher.decrypt(msg.encode()).decode()
+    except Exception as e:
+        print(f"Decryption failed for message: {msg[:20]}... Error: {e}")
+        return "[decrypt error]"
 
-    error = None
+# ---------------- PASSWORD ----------------
+def hash_password(password):
+    return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
 
-    if request.method == "POST":
+def check_password(password, hashed):
+    return bcrypt.checkpw(password.encode(), hashed.encode())
 
-        action = request.form.get("action")
-        username = request.form.get("username")
-        password = request.form.get("password")
+# ---------------- AUTH ----------------
+@socketio.on("register")
+def register(data):
+    username = data.get("username", "").strip()
+    password = data.get("password", "").strip()
 
-        db = get_db()
-        cursor = db.cursor()
-
-        if action == "register":
-
-            try:
-
-                cursor.execute(
-                    "INSERT INTO users(username,password) VALUES (?,?)",
-                    (username, generate_password_hash(password))
-                )
-
-                db.commit()
-
-                session["user"] = username
-
-                return redirect(url_for("dashboard"))
-
-            except sqlite3.IntegrityError:
-                error = "Username exists"
-
-        elif action == "login":
-
-            cursor.execute(
-                "SELECT * FROM users WHERE username=?",
-                (username,)
-            )
-
-            user = cursor.fetchone()
-
-            if user and check_password_hash(user["password"], password):
-
-                session["user"] = username
-
-                return redirect(url_for("dashboard"))
-
-            else:
-                error = "Invalid login"
-
-        db.close()
-
-    return render_template("index.html", error=error)
-
-
-@app.route("/dashboard")
-def dashboard():
-
-    if "user" not in session:
-        return redirect(url_for("index"))
-
-    db = get_db()
-    cursor = db.cursor()
-
-    cursor.execute("SELECT * FROM messages ORDER BY id ASC")
-    messages = cursor.fetchall()
-
-    cursor.execute(
-        "SELECT username FROM users WHERE username != ?",
-        (session["user"],)
-    )
-
-    users = cursor.fetchall()
-
-    db.close()
-
-    return render_template(
-        "dashboard.html",
-        user=session["user"],
-        messages=messages,
-        users=users
-    )
-
-
-@app.route("/logout")
-def logout():
-
-    session.pop("user", None)
-
-    return redirect(url_for("index"))
-
-
-
-
-
-@socketio.on("connect")
-def handle_connect():
-
-    if "user" not in session:
+    if not username or not password:
+        socketio.emit("auth", {"status": "error", "msg": "Invalid input"})
         return
 
-    username = session["user"]
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM users WHERE username=?", (username,))
+    if cursor.fetchone():
+        conn.close()
+        socketio.emit("auth", {"status": "error", "msg": "User exists"})
+        return
 
-    online_users.add(username)
+    cursor.execute(
+        "INSERT INTO users VALUES (?,?)",
+        (username, hash_password(password))
+    )
+    conn.commit()
+    conn.close()
+
+    socketio.emit("auth", {"status": "ok", "msg": "Registered", "user": username})
 
 
-    join_room(username)
+@socketio.on("login")
+def login(data):
+    username = data.get("username", "").strip()
+    password = data.get("password", "").strip()
 
-    emit("online_users", list(online_users), broadcast=True)
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT password FROM users WHERE username=?", (username,))
+    row = cursor.fetchone()
+
+    if not row or not check_password(password, row[0]):
+        conn.close()
+        socketio.emit("auth", {"status": "error", "msg": "Invalid login"})
+        return
+
+    users[request.sid] = username
+    user_sid[username] = request.sid
+
+    socketio.emit("auth", {"status": "ok", "msg": "Login success", "user": username})
+
+    # SEND GLOBAL HISTORY
+    cursor.execute("SELECT username, message, time FROM messages WHERE to_user='global' ORDER BY id ASC")
+    rows = cursor.fetchall()
+    conn.close()
+
+    history = []
+    for r in rows:
+        history.append({
+            "user": r[0],
+            "msg": decrypt_msg(r[1]),
+            "time": r[2]
+        })
+
+    socketio.emit("history", history)
+    emit_users()
+
+@socketio.on("get_history")
+def get_private_history(data):
+    username = users.get(request.sid)
+    other = data.get("other")
+    if not username or not other: return
+
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT username, message, time FROM messages 
+        WHERE (username=? AND to_user=?) OR (username=? AND to_user=?)
+        ORDER BY id ASC
+    """, (username, other, other, username))
+    rows = cursor.fetchall()
+    conn.close()
+
+    history = [{
+        "user": r[0],
+        "msg": decrypt_msg(r[1]),
+        "time": r[2]
+    } for r in rows]
+
+    socketio.emit("history", history, room=request.sid)
 
 
+# ---------------- CHAT ----------------
 @socketio.on("message")
-def handle_message(msg):
+def handle_message(data):
+    username = users.get(request.sid)
+    if not username: return
 
-    if "user" not in session:
-        return
+    msg = data.get("msg", "").strip()
+    to = data.get("to", "global")
+    if not msg: return
 
-    username = session["user"]
+    time_now = datetime.now().strftime("%H:%M:%S")
+    encrypted = encrypt_msg(msg)
 
-    timestamp = datetime.now().strftime("%H:%M")
-
-    db = get_db()
-    cursor = db.cursor()
-
+    conn = get_db()
+    cursor = conn.cursor()
     cursor.execute(
-        "INSERT INTO messages(username,message,timestamp) VALUES(?,?,?)",
-        (username, msg, timestamp)
+        "INSERT INTO messages (username, to_user, message, time) VALUES (?,?,?,?)",
+        (username, to, encrypted, time_now)
     )
+    conn.commit()
+    conn.close()
 
-    db.commit()
-    db.close()
+    payload = {
+        "user": username,
+        "to": to,
+        "msg": msg,
+        "time": time_now
+    }
 
-    emit(
-        "message",
-        {
-            "username": username,
-            "message": msg,
-            "time": timestamp
-        },
-        broadcast=True
-    )
-
-
-@socketio.on("join_private")
-def join_private(data):
-
-    if "user" not in session:
-        return
-
-    current = session["user"]
-    other = data["user"]
-
-    room = get_room(current, other)
-
-    join_room(room)
+    if to == "global":
+        socketio.emit("message", payload)
+    else:
+        # Private message: Send to both sender and receiver
+        if to in user_sid:
+            socketio.emit("message", payload, room=user_sid[to])
+        socketio.emit("message", payload, room=request.sid)
 
 
-@socketio.on("private_message")
-def private_message(data):
+# ---------------- TYPING ----------------
+@socketio.on("typing")
+def handle_typing(data):
+    username = users.get(request.sid)
+    to = data.get("to")
+    if username and to:
+        if to == "global":
+            socketio.emit("is_typing", {"user": username, "to": "global"}, skip_sid=request.sid)
+        elif to in user_sid:
+            socketio.emit("is_typing", {"user": username, "to": to}, room=user_sid[to])
 
-    if "user" not in session:
-        return
+# ---------------- REACTIONS ----------------
+@socketio.on("react")
+def handle_reaction(data):
+    username = users.get(request.sid)
+    msg_id = data.get("msg_id")
+    emoji = data.get("emoji")
+    if not username or not msg_id: return
 
-    sender = session["user"]
-    receiver = data["receiver"]
-    message = data["message"]
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT reactions FROM messages WHERE id=?", (msg_id,))
+    row = cursor.fetchone()
+    if row:
+        import json
+        reacts = json.loads(row[0])
+        reacts[username] = emoji
+        cursor.execute("UPDATE messages SET reactions=? WHERE id=?", (json.dumps(reacts), msg_id))
+        conn.commit()
+        socketio.emit("reaction_update", {"msg_id": msg_id, "reactions": reacts})
+    conn.close()
 
-    room = get_room(sender, receiver)
+# ---------------- GROUPS ----------------
+@socketio.on("create_group")
+def create_group(data):
+    username = users.get(request.sid)
+    name = data.get("name")
+    members = data.get("members", [])
+    if not username or not name: return
 
-    timestamp = datetime.now().strftime("%H:%M")
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO groups (name, created_by) VALUES (?,?)", (name, username))
+    group_id = cursor.lastrowid
+    cursor.execute("INSERT INTO group_members (group_id, username) VALUES (?,?)", (group_id, username))
+    for m in members:
+        cursor.execute("INSERT INTO group_members (group_id, username) VALUES (?,?)", (group_id, m))
+    conn.commit()
+    conn.close()
+    emit_users()
 
-    db = get_db()
-    cursor = db.cursor()
+@socketio.on("get_all_groups")
+def handle_get_all_groups():
+    conn = get_db()
+    cursor = conn.cursor()
+    groups = cursor.execute("SELECT * FROM groups").fetchall()
+    conn.close()
+    socketio.emit("all_groups_list", [{"id": g[0], "name": g[1]} for g in groups], room=request.sid)
 
-    cursor.execute(
-        """INSERT INTO private_messages
-        (sender,receiver,message,timestamp,status)
-        VALUES (?,?,?,?,?)""",
-        (sender, receiver, message, timestamp, "sent")
-    )
+@socketio.on("join_group")
+def handle_join_group(data):
+    username = users.get(request.sid)
+    group_id = data.get("id")
+    if not username or not group_id: return
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT 1 FROM group_members WHERE group_id=? AND username=?", (group_id, username))
+    if not cursor.fetchone():
+        cursor.execute("INSERT INTO group_members (group_id, username) VALUES (?,?)", (group_id, username))
+        conn.commit()
+    conn.close()
+    emit_users()
 
-    msg_id = cursor.lastrowid
+@socketio.on("mark_read")
+def mark_read(data):
+    username = users.get(request.sid)
+    other = data.get("other")
+    if not username or not other: return
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("UPDATE messages SET is_read=1 WHERE username=? AND to_user=?", (other, username))
+    conn.commit()
+    conn.close()
+    if other in user_sid:
+        socketio.emit("read_update", {"user": username}, room=user_sid[other])
+def emit_users():
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT username FROM users")
+    all_users = [row[0] for row in cursor.fetchall()]
+    conn.close()
 
-    db.commit()
-    db.close()
+    online_users = list(user_sid.keys())
 
-    emit(
-        "private_message",
-        {
-            "id": msg_id,
-            "sender": sender,
-            "receiver": receiver,
-            "message": message,
-            "time": timestamp,
-            "status": "sent"
-        },
-        room=room
-    )
-
-
-@socketio.on("message_read")
-def message_read(data):
-
-    msg_id = data["id"]
-
-    db = get_db()
-    cursor = db.cursor()
-
-    cursor.execute(
-        "UPDATE private_messages SET status='read' WHERE id=?",
-        (msg_id,)
-    )
-
-    db.commit()
-    db.close()
-
-    emit(
-        "message_status",
-        {
-            "id": msg_id,
-            "status": "read"
-        },
-        broadcast=True
-    )
+    socketio.emit("users", {
+        "all": all_users,
+        "online": online_users
+    })
 
 
 @socketio.on("disconnect")
-def handle_disconnect():
+def disconnect():
+    sid = request.sid
 
-    username = session.get("user")
+    if sid in users:
+        name = users[sid]
+        users.pop(sid, None)
+        user_sid.pop(name, None)
 
-    if not username:
-        return
-
-    online_users.discard(username)
-
-    emit("online_users", list(online_users), broadcast=True)
+        emit_users()
 
 
+# ---------------- ROUTE ----------------
+@app.route("/")
+def home():
+    return render_template("index.html")
+
+
+# ---------------- RUN ----------------
 if __name__ == "__main__":
-
-    port = int(os.environ.get("PORT", 5000))
-
-    socketio.run(
-        app,
-        host="0.0.0.0",
-        port=port,
-        debug=True,
-        allow_unsafe_werkzeug=True
-    )
+    socketio.run(app, debug=True, allow_unsafe_werkzeug=True)
