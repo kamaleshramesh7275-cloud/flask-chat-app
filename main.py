@@ -4,6 +4,7 @@ from datetime import datetime
 import sqlite3
 import bcrypt
 from cryptography.fernet import Fernet
+import os
 
 # ---------------- APP ----------------
 app = Flask(__name__)
@@ -334,4 +335,5 @@ def home():
 
 # ---------------- RUN ----------------
 if __name__ == "__main__":
-    socketio.run(app, debug=True, allow_unsafe_werkzeug=True)
+    port = int(os.environ.get("PORT", 5000))
+    socketio.run(app, host="0.0.0.0", port=port, debug=True, allow_unsafe_werkzeug=True)
